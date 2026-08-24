@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VIF | PUMI 2026</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
+<script src="https://js.arcgis.com/4.30/"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head><body>
+<div id="login" class="login"><div class="login-card"><div class="brand">VIF</div><h1>Visor PLANOVI 2026</h1><p>Plataforma de seguimiento basada en PUMI</p><input id="clave" type="password" placeholder="Clave de acceso"><button id="entrar">Ingresar</button><small>Clave inicial configurable en <b>app.js</b>.</small></div></div>
+<div id="app" class="hidden">
+<header><div><b>VIF · PUMI 2026</b><span>Seguimiento PLANOVI</span></div><button id="salir">Salir</button></header>
+<main>
+<section class="hero"><div><h1>Seguimiento VIF / PLANOVI</h1><p>Lectura por región, delegación, trimestre, mes programado, eje y población objetivo.</p></div>
+<label class="upload">Actualizar lectura<input id="excel" type="file" accept=".xlsx,.xls"></label></section>
+<section class="filters">
+<select id="fRegion"><option value="">Todas las regiones</option></select>
+<select id="fDeleg"><option value="">Todas las delegaciones</option></select>
+<select id="fTrim"><option value="">Todos los trimestres</option><option>T1</option><option>T2</option><option>T3</option><option>T4</option></select>
+<select id="fMes"><option value="">Todos los meses</option></select>
+<select id="fEje"><option value="">Todos los ejes</option></select>
+<select id="fPob"><option value="">Toda población</option></select>
+</section>
+<section class="kpis"><article><span>Delegaciones</span><strong id="kDeleg">0</strong></article><article><span>Regiones</span><strong id="kReg">0</strong></article><article><span>Actividades</span><strong id="kAct">0</strong></article><article><span>Avance registrado</span><strong id="kAv">0</strong></article><article><span>Cumplimiento</span><strong id="kPct">0%</strong></article></section>
+<section class="grid"><article class="panel map-panel"><div class="panel-head"><h2>Mapa de delegaciones</h2><span>Color según avance / línea base</span></div><div id="map"></div><div class="legend"><i class="g"></i>100% o más <i class="a"></i>50–99% <i class="r"></i>1–49% <i class="n"></i>Sin avance</div></article>
+<article class="panel"><div class="panel-head"><h2>Resumen por trimestre</h2></div><div id="quarters"></div><h2>Resumen por eje</h2><div id="axes"></div></article></section>
+<section class="panel"><div class="panel-head"><h2>Detalle de actividades</h2><span id="count"></span></div><div class="table-wrap"><table><thead><tr><th>Región</th><th>Delegación</th><th>Actividad</th><th>Eje</th><th>Población</th><th>Mes</th><th>Trimestre</th><th>Línea base</th><th>Avance</th><th>%</th></tr></thead><tbody id="tbody"></tbody></table></div></section>
+</main></div><script src="app.js"></script></body></html>
