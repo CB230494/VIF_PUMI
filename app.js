@@ -16,21 +16,25 @@ async function loadData(){
 }
 async function loadPumiDelegations(){
   try{
-    const r=await fetch(`${PUMI_API}/api/delegaciones`);
+    const r=await fetch(`${PUMI_API}/api/dashboard`);
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     const j=await r.json();
-    PUMI_DELEGACIONES=j.features||[];
+    PUMI_DELEGACIONES=(j.map_features||[]).map(f=>({
+      attributes:f.attributes||f,
+      geometry:f.geometry||f.__geometry||f.attributes?.__geometry||null
+    })).filter(f=>f.geometry);
     if($("map-status")) $("map-status").textContent=`${PUMI_DELEGACIONES.length} ubicaciones PUMI`;
     renderMap(filtered());
   }catch(e){
-    console.warn("No fue posible cargar PUMI_DELEGACIONES:",e); if($("map-status")) $("map-status").textContent="Sin conexión a PUMI_DELEGACIONES";
+    console.warn("No fue posible cargar el mapa PUMI:",e);
+    if($("map-status")) $("map-status").textContent="Mapa PUMI no disponible";
   }
 }
 function normalizeName(v=""){return v.toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/gi," ").replace(/\s+/g," ").trim().toUpperCase()}
 function exactGeometry(code,name){
   const nc=normalizeName(code), nn=normalizeName(name);
-  let f=PUMI_DELEGACIONES.find(x=>normalizeName(x.attributes?.codigo_delegacion||x.attributes?.codigo||"")===nc);
-  if(!f) f=PUMI_DELEGACIONES.find(x=>normalizeName(x.attributes?.delegacion||x.attributes?.nombre||"")===nn);
+  let f=PUMI_DELEGACIONES.find(x=>normalizeName(x.attributes?.codigo_delegacion||x.attributes?.codigo||x.attributes?.delegation_code||"")===nc);
+  if(!f) f=PUMI_DELEGACIONES.find(x=>normalizeName(x.attributes?.delegacion||x.attributes?.nombre||x.attributes?.delegation||"")===nn);
   return f?.geometry||null;
 }
 function unique(a){return [...new Set(a.filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))}
