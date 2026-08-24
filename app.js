@@ -2,9 +2,13 @@ const CLAVE="VIF2026";
 const PUMI_API="https://pumi-api.onrender.com";
 let DATA=null, view=null, graphicsLayer=null, PUMI_DELEGACIONES=[];
 const $=id=>document.getElementById(id), norm=s=>(s??"").toString().trim();
-$("entrar").onclick=()=>{if($("clave").value===CLAVE){sessionStorage.vif="1";openApp()}else alert("Clave incorrecta")};
-$("salir").onclick=()=>{sessionStorage.removeItem("vif");location.reload()};
-function openApp(){$("login").classList.add("hidden");$("app").classList.remove("hidden");loadData()}
+$("login-form").onsubmit=e=>{e.preventDefault();if($("login-password").value===CLAVE){sessionStorage.vif="1";openApp()}else $("login-error").classList.remove("hidden")};
+$("btn-logout").onclick=()=>{sessionStorage.removeItem("vif");location.reload()};
+$("btn-toggle-sidebar").onclick=()=>document.querySelector(".sidebar").classList.toggle("collapsed");
+$("btn-refresh").onclick=()=>location.reload();
+$("nav-map").onclick=()=>$("map-section").scrollIntoView({behavior:"smooth"});
+$("nav-detail").onclick=()=>$("detail-section").scrollIntoView({behavior:"smooth"});
+function openApp(){$("login-view").classList.add("hidden");$("main-view").classList.remove("hidden");loadData()}
 async function loadData(){
   DATA=await fetch("data/vif-data.json").then(r=>r.json());
   setup(); render(); initMap();
@@ -16,9 +20,10 @@ async function loadPumiDelegations(){
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     const j=await r.json();
     PUMI_DELEGACIONES=j.features||[];
+    if($("map-status")) $("map-status").textContent=`${PUMI_DELEGACIONES.length} ubicaciones PUMI`;
     renderMap(filtered());
   }catch(e){
-    console.warn("No fue posible cargar PUMI_DELEGACIONES:",e);
+    console.warn("No fue posible cargar PUMI_DELEGACIONES:",e); if($("map-status")) $("map-status").textContent="Sin conexión a PUMI_DELEGACIONES";
   }
 }
 function normalizeName(v=""){return v.toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/gi," ").replace(/\s+/g," ").trim().toUpperCase()}
@@ -46,9 +51,12 @@ function renderMap(rows){
     const geom=exactGeometry(code,x.delegacion);
     if(!geom)return;
     const c=p>=100?"#25865d":p>=50?"#d89a25":p>0?"#c64a4a":"#8996a3";
+    const symbol=geom.type==="polygon"
+      ? {type:"simple-fill",color:c,outline:{color:"#ffffff",width:1}}
+      : {type:"simple-marker",size:14,color:c,outline:{color:"#fff",width:1.5}};
     graphicsLayer.add(new EsriGraphic({
       geometry:geom,
-      symbol:{type:"simple-marker",size:14,color:c,outline:{color:"#fff",width:1.5}},
+      symbol:symbol,
       attributes:{code,deleg:x.delegacion,region:x.region,p:p.toFixed(1),av:a.av,base:a.base},
       popupTemplate:{title:"{code} · {deleg}",content:"<b>{region}</b><br>Avance: {av}<br>Línea base: {base}<br>Cumplimiento: <b>{p}%</b>"}
     }))
