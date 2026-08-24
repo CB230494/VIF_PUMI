@@ -1,27 +1,25 @@
-<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VIF | PUMI 2026</title>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
-<script src="https://js.arcgis.com/4.30/"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-</head><body>
-<div id="login" class="login"><div class="login-card"><div class="brand">VIF</div><h1>Visor PLANOVI 2026</h1><p>Plataforma de seguimiento basada en PUMI</p><input id="clave" type="password" placeholder="Clave de acceso"><button id="entrar">Ingresar</button><small>Clave inicial configurable en <b>app.js</b>.</small></div></div>
-<div id="app" class="hidden">
-<header><div><b>VIF · PUMI 2026</b><span>Seguimiento PLANOVI</span></div><button id="salir">Salir</button></header>
-<main>
-<section class="hero"><div><h1>Seguimiento VIF / PLANOVI</h1><p>Lectura por región, delegación, trimestre, mes programado, eje y población objetivo.</p></div>
-<label class="upload">Actualizar lectura<input id="excel" type="file" accept=".xlsx,.xls"></label></section>
-<section class="filters">
-<select id="fRegion"><option value="">Todas las regiones</option></select>
-<select id="fDeleg"><option value="">Todas las delegaciones</option></select>
-<select id="fTrim"><option value="">Todos los trimestres</option><option>T1</option><option>T2</option><option>T3</option><option>T4</option></select>
-<select id="fMes"><option value="">Todos los meses</option></select>
-<select id="fEje"><option value="">Todos los ejes</option></select>
-<select id="fPob"><option value="">Toda población</option></select>
-</section>
-<section class="kpis"><article><span>Delegaciones</span><strong id="kDeleg">0</strong></article><article><span>Regiones</span><strong id="kReg">0</strong></article><article><span>Actividades</span><strong id="kAct">0</strong></article><article><span>Avance registrado</span><strong id="kAv">0</strong></article><article><span>Cumplimiento</span><strong id="kPct">0%</strong></article></section>
-<section class="grid"><article class="panel map-panel"><div class="panel-head"><h2>Mapa de delegaciones</h2><span>Color según avance / línea base</span></div><div id="map"></div><div class="legend"><i class="g"></i>100% o más <i class="a"></i>50–99% <i class="r"></i>1–49% <i class="n"></i>Sin avance</div></article>
-<article class="panel"><div class="panel-head"><h2>Resumen por trimestre</h2></div><div id="quarters"></div><h2>Resumen por eje</h2><div id="axes"></div></article></section>
-<section class="panel"><div class="panel-head"><h2>Detalle de actividades</h2><span id="count"></span></div><div class="table-wrap"><table><thead><tr><th>Región</th><th>Delegación</th><th>Actividad</th><th>Eje</th><th>Población</th><th>Mes</th><th>Trimestre</th><th>Línea base</th><th>Avance</th><th>%</th></tr></thead><tbody id="tbody"></tbody></table></div></section>
-</main></div><script src="app.js"></script></body></html>
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#002B7F">
+<title>VIF 2026</title><link rel="stylesheet" href="https://js.arcgis.com/4.31/esri/themes/light/main.css"><link rel="stylesheet" href="styles.css"><script src="https://js.arcgis.com/4.31/"></script>
+</head><body><div id="app">
+<section id="login-view" class="login-view"><div class="login-overlay"></div><div class="login-card">
+<div class="login-brand"><div class="brand-emblem">VIF</div><div><p class="eyebrow">Ministerio de Seguridad Pública</p><h1>Seguimiento VIF · PLANOVI 2026</h1><p class="login-description">Consulta y seguimiento institucional de las actividades programadas.</p></div></div>
+<div class="login-form-panel"><div class="login-form-header"><span class="login-badge">VIF 2026</span><h2>Ingreso al sistema</h2><p>Digite la contraseña de acceso.</p></div>
+<form id="login-form" class="login-fields"><label class="login-input-group"><span>Contraseña</span><input id="login-password" type="password" autocomplete="current-password" placeholder="Digite su contraseña" required></label><button class="btn btn-primary btn-block" type="submit">Ingresar</button></form><p id="login-error" class="form-message error hidden">Contraseña incorrecta.</p></div>
+</div></section>
+<section id="main-view" class="main-view hidden">
+<aside class="sidebar"><div class="sidebar-header"><div class="sidebar-logo">VIF</div><button id="btn-toggle-sidebar" class="icon-button" aria-label="Contraer menú">☰</button></div>
+<div class="sidebar-user"><div class="avatar">V</div><div><strong>Visor VIF</strong><small>PLANOVI 2026</small></div></div>
+<nav class="sidebar-nav"><button class="nav-item active">▦ <span>Panel principal</span></button><button class="nav-item" id="nav-map">⌖ <span>Mapa nacional</span></button><button class="nav-item" id="nav-detail">≡ <span>Detalle</span></button></nav>
+<div class="sidebar-footer"><button id="btn-logout" class="btn btn-outline btn-block">Cerrar sesión</button></div></aside>
+<div class="page-shell"><header class="topbar"><div><p class="eyebrow">Sistema institucional</p><h1>Seguimiento VIF · PLANOVI</h1><p class="page-scope">Cobertura nacional · 98 delegaciones · 14 regiones</p></div><div class="topbar-actions"><button id="btn-refresh" class="btn btn-secondary">Actualizar</button></div></header>
+<main class="content-area">
+<section class="hero-card"><div><span class="hero-label">Panel nacional</span><h2>Actividades VIF 2026</h2><p>Seguimiento por trimestre, mes, delegación, región, eje y población objetivo.</p></div></section>
+<section class="vif-card"><div class="vif-card-head"><h3>Filtros de consulta</h3></div><div class="vif-filter-grid">
+<label>Región<select id="fRegion"><option value="">Todas las regiones</option></select></label><label>Delegación<select id="fDeleg"><option value="">Todas las delegaciones</option></select></label><label>Trimestre<select id="fTrim"><option value="">Todos</option><option>T1</option><option>T2</option><option>T3</option><option>T4</option></select></label><label>Mes<select id="fMes"><option value="">Todos los meses</option></select></label><label>Eje<select id="fEje"><option value="">Todos los ejes</option></select></label><label>Población objetivo<select id="fPob"><option value="">Todas</option></select></label>
+</div></section>
+<section class="vif-kpis"><article class="vif-kpi"><small>Delegaciones</small><strong id="kDeleg">0</strong></article><article class="vif-kpi"><small>Regiones</small><strong id="kReg">0</strong></article><article class="vif-kpi"><small>Actividades</small><strong id="kAct">0</strong></article><article class="vif-kpi"><small>Avance registrado</small><strong id="kAv">0</strong></article><article class="vif-kpi"><small>Avance</small><strong id="kPct">0%</strong></article></section>
+<section class="vif-grid" id="map-section"><article class="vif-card"><div class="vif-card-head"><h3>Mapa nacional por delegación</h3><span id="map-status"></span></div><div id="map"></div><div class="vif-legend"><span><i style="background:#25865d"></i>100% o más</span><span><i style="background:#d89a25"></i>50–99%</span><span><i style="background:#c64a4a"></i>1–49%</span><span><i style="background:#8996a3"></i>Sin avance</span></div></article>
+<article class="vif-card"><div class="vif-card-head"><h3>Resumen por trimestre</h3></div><div id="quarters"></div><div class="vif-card-head" style="margin-top:26px"><h3>Resumen por eje</h3></div><div id="axes"></div></article></section>
+<section class="vif-card" id="detail-section" style="margin-top:16px"><div class="vif-card-head"><h3>Detalle de actividades</h3><span id="count"></span></div><div class="table-wrap"><table><thead><tr><th>Región</th><th>Delegación</th><th>Actividad</th><th>Eje</th><th>Población</th><th>Mes</th><th>Trimestre</th><th>Línea base</th><th>Avance</th><th>%</th></tr></thead><tbody id="tbody"></tbody></table></div></section>
+</main></div></section></div><script src="app.js"></script></body></html>
