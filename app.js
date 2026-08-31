@@ -257,7 +257,7 @@ function renderBars(rows,key,id){
   }).join("")||"<p>Sin datos.</p>"
 }
 function renderTable(rows){
-  const ag=aggregate(rows);$("count").textContent=ag.rows.length+" registros trimestrales";
+  const ag=aggregate(rows);$("count").textContent=ag.rows.length+" registros programados";
   $("tbody").innerHTML=ag.rows.slice(0,1200).map(x=>{
     const annualBase=+x.linea_base_anual||0;
     const p=(annualBase&&x.trimestre_programado===x.trimestre)?((+x.avance||0)/annualBase*100):null;
