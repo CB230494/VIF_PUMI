@@ -181,38 +181,100 @@ function createMarkerSvg(color){
 
 function unique(a){return [...new Set(a.filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"))}
 function addOptions(id,arr){const s=$(id), first=s.options[0].outerHTML;s.innerHTML=first+arr.map(x=>`<option>${x}</option>`).join("")}
-function setup(){addOptions("fRegion",unique(DATA.registros.map(x=>x.region)));addOptions("fDeleg",unique(DATA.registros.map(x=>x.delegacion)));addOptions("fMes",unique(DATA.registros.map(x=>x.mes_programado)));addOptions("fEje",unique(DATA.registros.map(x=>x.eje)));addOptions("fPob",unique(DATA.registros.map(x=>x.poblacion)));["fRegion","fDeleg","fTrim","fMes","fEje","fPob"].forEach(id=>$(id).onchange=render)}
-function filtered(){return DATA.registros.filter(x=>(!$("fRegion").value||x.region===$("fRegion").value)&&(!$("fDeleg").value||x.delegacion===$("fDeleg").value)&&(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))}
-function aggregate(rows){const seen=new Map(); rows.forEach(x=>{const k=x.codigo_delegacion+"|"+x.codigo+"|"+x.trimestre;seen.set(k,x)});const vals=[...seen.values()];return {rows:vals,base:vals.reduce((s,x)=>s+(+x.linea_base||0),0),av:vals.reduce((s,x)=>s+(+x.avance||0),0)}}
-function percentage(rows){const a=aggregate(rows);return a.base?a.av/a.base*100:0}
-function complianceClass(p){return p>=50?"good":p>=25?"mid":"low"}
-function complianceColor(p){return p>=50?"#25865d":p>=25?"#d89a25":"#c64a4a"}
-function nonGeographicFiltered(){return DATA.registros.filter(x=>(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))}
-function render(){const rows=filtered(), ag=aggregate(rows), p=ag.base?ag.av/ag.base*100:0;$("kDeleg").textContent=unique(rows.map(x=>x.codigo_delegacion)).length;$("kReg").textContent=unique(rows.map(x=>x.region)).length;$("kAct").textContent=unique(rows.map(x=>x.codigo)).length;$("kAv").textContent=Math.round(ag.av).toLocaleString("es-CR");$("kPct").textContent=p.toFixed(1)+"%";$("kPct").className=complianceClass(p);renderTotals();renderBars(rows,"trimestre","quarters");renderBars(rows,"eje","axes");renderTable(rows);renderMap(rows)}
+function setup(){
+  addOptions("fRegion",unique(DATA.registros.map(x=>x.region)));
+  addOptions("fDeleg",unique(DATA.registros.map(x=>x.delegacion)));
+  addOptions("fMes",unique(DATA.registros.map(x=>x.mes_programado)));
+  addOptions("fEje",unique(DATA.registros.map(x=>x.eje)));
+  addOptions("fPob",unique(DATA.registros.map(x=>x.poblacion)));
+  ["fRegion","fDeleg","fTrim","fMes","fEje","fPob"].forEach(id=>$(id).onchange=render)
+}
+function filtered(){
+  return DATA.registros.filter(x=>(!$("fRegion").value||x.region===$("fRegion").value)&&(!$("fDeleg").value||x.delegacion===$("fDeleg").value)&&(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))
+}
+function nonGeographicFiltered(){
+  return DATA.registros.filter(x=>(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))
+}
+function aggregate(rows){
+  const dedup=new Map();
+  rows.forEach(x=>dedup.set(`${x.codigo_delegacion}|${x.codigo}|${x.trimestre}`,x));
+  const vals=[...dedup.values()];
+  const quarters=unique(vals.map(x=>x.trimestre));
+  const singleQuarter=quarters.length===1?quarters[0]:"";
+  const activities=new Map();
+  vals.forEach(x=>{
+    const k=`${x.codigo_delegacion}|${x.codigo}`;
+    if(!activities.has(k)) activities.set(k,[]);
+    activities.get(k).push(x);
+  });
+  let base=0, measuredAv=0, totalAv=0;
+  vals.forEach(x=>totalAv+=(+x.avance||0));
+  activities.forEach(group=>{
+    const sample=group[0];
+    const annualBase=+sample.linea_base_anual||0;
+    if(!annualBase) return;
+    const includeTarget=!singleQuarter||sample.trimestre_programado===singleQuarter;
+    if(!includeTarget) return;
+    base+=annualBase;
+    if(singleQuarter){
+      measuredAv+=group.filter(x=>x.trimestre===singleQuarter).reduce((s,x)=>s+(+x.avance||0),0);
+    }else{
+      measuredAv+=group.reduce((s,x)=>s+(+x.avance||0),0);
+    }
+  });
+  return {rows:vals,base,measuredAv,totalAv,pct:base?measuredAv/base*100:null};
+}
+function complianceClass(p){return p==null||!Number.isFinite(p)?"na":p>=50?"good":p>=25?"mid":"low"}
+function complianceColor(p){return p==null||!Number.isFinite(p)?"#8a98a8":p>=50?"#25865d":p>=25?"#d89a25":"#c64a4a"}
+function pctText(p){return p==null||!Number.isFinite(p)?"N/A":p.toFixed(1)+"%"}
+function render(){
+  const rows=filtered(), ag=aggregate(rows), p=ag.pct;
+  $("kDeleg").textContent=unique(rows.map(x=>x.codigo_delegacion)).length;
+  $("kReg").textContent=unique(rows.map(x=>x.region)).length;
+  $("kAct").textContent=unique(rows.map(x=>x.codigo)).length;
+  $("kAv").textContent=Math.round(ag.totalAv).toLocaleString("es-CR");
+  $("kPct").textContent=pctText(p);
+  $("kPct").className=complianceClass(p);
+  renderTotals();renderBars(rows,"trimestre","quarters");renderBars(rows,"eje","axes");renderTable(rows);renderMap(rows)
+}
 function renderTotals(){
   const baseRows=nonGeographicFiltered();
-  const national=aggregate(baseRows), np=national.base?national.av/national.base*100:0;
-  $("national-total").innerHTML=`<div class="total-card ${complianceClass(np)}"><small>TOTAL GENERAL · NACIONAL</small><strong>${np.toFixed(1)}%</strong><span>${unique(baseRows.map(x=>x.codigo_delegacion)).length} delegaciones · Avance ${Math.round(national.av).toLocaleString("es-CR")} / Meta ${Math.round(national.base).toLocaleString("es-CR")}</span></div>`;
+  const national=aggregate(baseRows), np=national.pct;
+  $("national-total").innerHTML=`<div class="total-card ${complianceClass(np)}"><small>TOTAL GENERAL · NACIONAL</small><strong>${pctText(np)}</strong><span>${unique(baseRows.map(x=>x.codigo_delegacion)).length} delegaciones · ${unique(baseRows.map(x=>x.codigo)).length} actividades · Avance medible ${Math.round(national.measuredAv).toLocaleString("es-CR")} / Meta numérica ${Math.round(national.base).toLocaleString("es-CR")}</span></div>`;
   const selectedRegion=$("fRegion").value;
-  const groups={};baseRows.forEach(x=>{if(!selectedRegion||x.region===selectedRegion)(groups[x.region]??=[]).push(x)});
-  $("region-totals").innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,"es")).map(([region,v])=>{const a=aggregate(v),p=a.base?a.av/a.base*100:0;return `<article class="region-total ${complianceClass(p)}"><div><small>${region}</small><span>${unique(v.map(x=>x.codigo_delegacion)).length} delegaciones · ${Math.round(a.av).toLocaleString("es-CR")} / ${Math.round(a.base).toLocaleString("es-CR")}</span></div><strong>${p.toFixed(1)}%</strong></article>`}).join("")||"<p>Sin datos para los filtros seleccionados.</p>";
+  const groups={};
+  baseRows.forEach(x=>{if(!selectedRegion||x.region===selectedRegion)(groups[x.region]??=[]).push(x)});
+  $("region-totals").innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,"es")).map(([region,v])=>{
+    const a=aggregate(v),p=a.pct;
+    return `<article class="region-total ${complianceClass(p)}"><div><small>${region}</small><span>${unique(v.map(x=>x.codigo_delegacion)).length} delegaciones · ${unique(v.map(x=>x.codigo)).length} actividades · ${Math.round(a.measuredAv).toLocaleString("es-CR")} / ${Math.round(a.base).toLocaleString("es-CR")}</span></div><strong>${pctText(p)}</strong></article>`
+  }).join("")||"<p>Sin datos para los filtros seleccionados.</p>";
 }
-function renderBars(rows,key,id){const groups={};rows.forEach(x=>(groups[x[key]]??=[]).push(x));$(id).innerHTML=Object.entries(groups).sort().map(([k,v])=>{const a=aggregate(v),p=a.base?a.av/a.base*100:0;return `<div class="barrow"><div class="barlabel"><b>${k||"Sin dato"}</b><span class="pct ${complianceClass(p)}">${p.toFixed(1)}%</span></div><div class="bar"><i style="width:${Math.min(p,100)}%;background:${complianceColor(p)}"></i></div></div>`}).join("")||"<p>Sin datos.</p>"}
-function renderTable(rows){const ag=aggregate(rows);$("count").textContent=ag.rows.length+" registros";$("tbody").innerHTML=ag.rows.slice(0,800).map(x=>{const p=+x.porcentaje||0,c=complianceClass(p);return `<tr><td>${x.region}</td><td><b>${x.codigo_delegacion}</b> ${x.delegacion}</td><td>${x.actividad}</td><td>${x.eje}</td><td>${x.poblacion}</td><td>${x.mes_programado}</td><td>${x.trimestre}</td><td>${x.linea_base??""}</td><td>${x.avance}</td><td class="pct ${c}">${p.toFixed(1)}%</td></tr>`}).join("")}
+function renderBars(rows,key,id){
+  const groups={};rows.forEach(x=>(groups[x[key]]??=[]).push(x));
+  $(id).innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,"es")).map(([k,v])=>{
+    const a=aggregate(v),p=a.pct,w=p==null?0:Math.min(p,100);
+    return `<div class="barrow"><div class="barlabel"><b>${k||"Sin dato"}</b><span class="pct ${complianceClass(p)}">${pctText(p)}</span></div><div class="bar"><i style="width:${w}%;background:${complianceColor(p)}"></i></div></div>`
+  }).join("")||"<p>Sin datos.</p>"
+}
+function renderTable(rows){
+  const ag=aggregate(rows);$("count").textContent=ag.rows.length+" registros trimestrales";
+  $("tbody").innerHTML=ag.rows.slice(0,1200).map(x=>{
+    const annualBase=+x.linea_base_anual||0;
+    const p=(annualBase&&x.trimestre_programado===x.trimestre)?((+x.avance||0)/annualBase*100):null;
+    const baseLabel=x.linea_base_texto||((annualBase)?annualBase:"");
+    return `<tr><td>${x.region}</td><td><b>${x.codigo_delegacion}</b> ${x.delegacion}</td><td><b>${x.codigo}</b> · ${x.actividad}</td><td>${x.eje||"—"}</td><td>${x.poblacion||"—"}</td><td>${x.mes_programado||"—"}</td><td>${x.trimestre}</td><td>${baseLabel||"—"}</td><td>${(+x.avance||0).toLocaleString("es-CR")}</td><td class="pct ${complianceClass(p)}">${pctText(p)}</td></tr>`
+  }).join("")
+}
 function initMap(){require(["esri/Map","esri/views/MapView","esri/layers/GraphicsLayer","esri/Graphic"],(Map,MapView,GraphicsLayer,Graphic)=>{window.EsriGraphic=Graphic;graphicsLayer=new GraphicsLayer();view=new MapView({container:"map",map:new Map({basemap:"streets-navigation-vector",layers:[graphicsLayer]}),center:[-84.1,9.95],zoom:7});renderMap(filtered())})}
 function renderMap(rows){
-  if(!graphicsLayer || !window.EsriGraphic) return;
+  if(!graphicsLayer||!window.EsriGraphic)return;
   graphicsLayer.removeAll();
-  const groups={};
-  rows.forEach(x=>(groups[x.codigo_delegacion]??=[]).push(x));
+  const groups={};rows.forEach(x=>(groups[x.codigo_delegacion]??=[]).push(x));
   let drawn=0;
   Object.entries(groups).forEach(([code,v])=>{
-    const a=aggregate(v),p=a.base?a.av/a.base*100:0,x=v[0],co=delegationCoordinates(x.delegacion);
-    if(!co) return;
-    const color=complianceColor(p);
-    graphicsLayer.add(new EsriGraphic({geometry:{type:"point",longitude:co.longitude,latitude:co.latitude,spatialReference:{wkid:4326}},symbol:{type:"picture-marker",url:createMarkerSvg(color),width:"34px",height:"43px",yoffset:"12px"},attributes:{code,deleg:x.delegacion,region:x.region,p:p.toFixed(1),av:a.av,base:a.base},popupTemplate:{title:"{code} · {deleg}",content:"<b>{region}</b><br>Avance: {av}<br>Línea base: {base}<br>Cumplimiento: <b>{p}%</b>"}}));
-    drawn++;
+    const a=aggregate(v),p=a.pct,x=v[0],co=delegationCoordinates(x.delegacion);if(!co)return;
+    graphicsLayer.add(new EsriGraphic({geometry:{type:"point",longitude:co.longitude,latitude:co.latitude,spatialReference:{wkid:4326}},symbol:{type:"picture-marker",url:createMarkerSvg(complianceColor(p)),width:"34px",height:"43px",yoffset:"12px"},attributes:{code,deleg:x.delegacion,region:x.region,p:pctText(p),av:Math.round(a.measuredAv),base:Math.round(a.base),acts:unique(v.map(z=>z.codigo)).length},popupTemplate:{title:"{code} · {deleg}",content:"<b>{region}</b><br>Actividades visibles: {acts}<br>Avance medible: {av}<br>Meta numérica: {base}<br>Cumplimiento: <b>{p}</b>"}}));drawn++
   });
-  if($("map-status")) $("map-status").textContent=`${drawn} delegaciones ubicadas`;
+  if($("map-status"))$("map-status").textContent=`${drawn} delegaciones ubicadas`;
 }
 if(sessionStorage.vif==="1")openApp();
