@@ -102,6 +102,7 @@ const COORDENADAS_REFERENCIA = {
 const ALIASES_COORDENADAS = [
   ["SAN CARLOS ESTE","SAN CARLOS"],
   ["SAN CARLOS OESTE","SAN CARLOS"],
+  ["SAN CARLO OESTE","SAN CARLOS"],
   ["ALAJUELA SUR","ALAJUELA"],
   ["ALAJUELA NORTE","ALAJUELA"],
   ["DESAMPARADOS NORTE","DESAMPARADOS"],
@@ -110,7 +111,8 @@ const ALIASES_COORDENADAS = [
   ["POCOCI SUR","POCOCI"],
   ["PUERTO JIMENEZ","GOLFITO"],
   ["PAQUERA","PUNTARENAS"],
-  ["VAZQUEZ DE CORONADO","VASQUEZ DE CORONADO"]
+  ["VAZQUEZ DE CORONADO","VASQUEZ DE CORONADO"],
+  ["GUADALUPE","CARTAGO"]
 ];
 
 let DATA=null, view=null, graphicsLayer=null;
@@ -182,63 +184,35 @@ function addOptions(id,arr){const s=$(id), first=s.options[0].outerHTML;s.innerH
 function setup(){addOptions("fRegion",unique(DATA.registros.map(x=>x.region)));addOptions("fDeleg",unique(DATA.registros.map(x=>x.delegacion)));addOptions("fMes",unique(DATA.registros.map(x=>x.mes_programado)));addOptions("fEje",unique(DATA.registros.map(x=>x.eje)));addOptions("fPob",unique(DATA.registros.map(x=>x.poblacion)));["fRegion","fDeleg","fTrim","fMes","fEje","fPob"].forEach(id=>$(id).onchange=render)}
 function filtered(){return DATA.registros.filter(x=>(!$("fRegion").value||x.region===$("fRegion").value)&&(!$("fDeleg").value||x.delegacion===$("fDeleg").value)&&(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))}
 function aggregate(rows){const seen=new Map(); rows.forEach(x=>{const k=x.codigo_delegacion+"|"+x.codigo+"|"+x.trimestre;seen.set(k,x)});const vals=[...seen.values()];return {rows:vals,base:vals.reduce((s,x)=>s+(+x.linea_base||0),0),av:vals.reduce((s,x)=>s+(+x.avance||0),0)}}
-function render(){const rows=filtered(), ag=aggregate(rows);$("kDeleg").textContent=unique(rows.map(x=>x.codigo_delegacion)).length;$("kReg").textContent=unique(rows.map(x=>x.region)).length;$("kAct").textContent=unique(rows.map(x=>x.codigo)).length;$("kAv").textContent=Math.round(ag.av).toLocaleString("es-CR");$("kPct").textContent=(ag.base?ag.av/ag.base*100:0).toFixed(1)+"%";renderBars(rows,"trimestre","quarters");renderBars(rows,"eje","axes");renderTable(rows);renderMap(rows)}
-function renderBars(rows,key,id){const groups={};rows.forEach(x=>(groups[x[key]]??=[]).push(x));$(id).innerHTML=Object.entries(groups).sort().map(([k,v])=>{const a=aggregate(v),p=a.base?a.av/a.base*100:0;return `<div class="barrow"><div class="barlabel"><b>${k||"Sin dato"}</b><span>${p.toFixed(1)}%</span></div><div class="bar"><i style="width:${Math.min(p,100)}%"></i></div></div>`}).join("")||"<p>Sin datos.</p>"}
-function renderTable(rows){const ag=aggregate(rows);$("count").textContent=ag.rows.length+" registros";$("tbody").innerHTML=ag.rows.slice(0,800).map(x=>{let c=x.porcentaje>=100?"good":x.porcentaje>=50?"mid":"low";return `<tr><td>${x.region}</td><td><b>${x.codigo_delegacion}</b> ${x.delegacion}</td><td>${x.actividad}</td><td>${x.eje}</td><td>${x.poblacion}</td><td>${x.mes_programado}</td><td>${x.trimestre}</td><td>${x.linea_base??""}</td><td>${x.avance}</td><td class="pct ${c}">${(+x.porcentaje).toFixed(1)}%</td></tr>`}).join("")}
+function percentage(rows){const a=aggregate(rows);return a.base?a.av/a.base*100:0}
+function complianceClass(p){return p>=50?"good":p>=25?"mid":"low"}
+function complianceColor(p){return p>=50?"#25865d":p>=25?"#d89a25":"#c64a4a"}
+function nonGeographicFiltered(){return DATA.registros.filter(x=>(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))}
+function render(){const rows=filtered(), ag=aggregate(rows), p=ag.base?ag.av/ag.base*100:0;$("kDeleg").textContent=unique(rows.map(x=>x.codigo_delegacion)).length;$("kReg").textContent=unique(rows.map(x=>x.region)).length;$("kAct").textContent=unique(rows.map(x=>x.codigo)).length;$("kAv").textContent=Math.round(ag.av).toLocaleString("es-CR");$("kPct").textContent=p.toFixed(1)+"%";$("kPct").className=complianceClass(p);renderTotals();renderBars(rows,"trimestre","quarters");renderBars(rows,"eje","axes");renderTable(rows);renderMap(rows)}
+function renderTotals(){
+  const baseRows=nonGeographicFiltered();
+  const national=aggregate(baseRows), np=national.base?national.av/national.base*100:0;
+  $("national-total").innerHTML=`<div class="total-card ${complianceClass(np)}"><small>TOTAL GENERAL · NACIONAL</small><strong>${np.toFixed(1)}%</strong><span>${unique(baseRows.map(x=>x.codigo_delegacion)).length} delegaciones · Avance ${Math.round(national.av).toLocaleString("es-CR")} / Meta ${Math.round(national.base).toLocaleString("es-CR")}</span></div>`;
+  const selectedRegion=$("fRegion").value;
+  const groups={};baseRows.forEach(x=>{if(!selectedRegion||x.region===selectedRegion)(groups[x.region]??=[]).push(x)});
+  $("region-totals").innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,"es")).map(([region,v])=>{const a=aggregate(v),p=a.base?a.av/a.base*100:0;return `<article class="region-total ${complianceClass(p)}"><div><small>${region}</small><span>${unique(v.map(x=>x.codigo_delegacion)).length} delegaciones · ${Math.round(a.av).toLocaleString("es-CR")} / ${Math.round(a.base).toLocaleString("es-CR")}</span></div><strong>${p.toFixed(1)}%</strong></article>`}).join("")||"<p>Sin datos para los filtros seleccionados.</p>";
+}
+function renderBars(rows,key,id){const groups={};rows.forEach(x=>(groups[x[key]]??=[]).push(x));$(id).innerHTML=Object.entries(groups).sort().map(([k,v])=>{const a=aggregate(v),p=a.base?a.av/a.base*100:0;return `<div class="barrow"><div class="barlabel"><b>${k||"Sin dato"}</b><span class="pct ${complianceClass(p)}">${p.toFixed(1)}%</span></div><div class="bar"><i style="width:${Math.min(p,100)}%;background:${complianceColor(p)}"></i></div></div>`}).join("")||"<p>Sin datos.</p>"}
+function renderTable(rows){const ag=aggregate(rows);$("count").textContent=ag.rows.length+" registros";$("tbody").innerHTML=ag.rows.slice(0,800).map(x=>{const p=+x.porcentaje||0,c=complianceClass(p);return `<tr><td>${x.region}</td><td><b>${x.codigo_delegacion}</b> ${x.delegacion}</td><td>${x.actividad}</td><td>${x.eje}</td><td>${x.poblacion}</td><td>${x.mes_programado}</td><td>${x.trimestre}</td><td>${x.linea_base??""}</td><td>${x.avance}</td><td class="pct ${c}">${p.toFixed(1)}%</td></tr>`}).join("")}
 function initMap(){require(["esri/Map","esri/views/MapView","esri/layers/GraphicsLayer","esri/Graphic"],(Map,MapView,GraphicsLayer,Graphic)=>{window.EsriGraphic=Graphic;graphicsLayer=new GraphicsLayer();view=new MapView({container:"map",map:new Map({basemap:"streets-navigation-vector",layers:[graphicsLayer]}),center:[-84.1,9.95],zoom:7});renderMap(filtered())})}
 function renderMap(rows){
   if(!graphicsLayer || !window.EsriGraphic) return;
-
   graphicsLayer.removeAll();
   const groups={};
   rows.forEach(x=>(groups[x.codigo_delegacion]??=[]).push(x));
-
   let drawn=0;
-
   Object.entries(groups).forEach(([code,v])=>{
-    const a=aggregate(v);
-    const p=a.base ? a.av/a.base*100 : 0;
-    const x=v[0];
-    const co=delegationCoordinates(x.delegacion);
+    const a=aggregate(v),p=a.base?a.av/a.base*100:0,x=v[0],co=delegationCoordinates(x.delegacion);
     if(!co) return;
-
-    const color=p>=100 ? "#25865d"
-      : p>=50 ? "#d89a25"
-      : p>0 ? "#c64a4a"
-      : "#8996a3";
-
-    graphicsLayer.add(new EsriGraphic({
-      geometry:{
-        type:"point",
-        longitude:co.longitude,
-        latitude:co.latitude,
-        spatialReference:{wkid:4326}
-      },
-      symbol:{
-        type:"picture-marker",
-        url:createMarkerSvg(color),
-        width:"34px",
-        height:"43px",
-        yoffset:"12px"
-      },
-      attributes:{
-        code,
-        deleg:x.delegacion,
-        region:x.region,
-        p:p.toFixed(1),
-        av:a.av,
-        base:a.base
-      },
-      popupTemplate:{
-        title:"{code} · {deleg}",
-        content:"<b>{region}</b><br>Avance: {av}<br>Línea base: {base}<br>Avance: <b>{p}%</b>"
-      }
-    }));
+    const color=complianceColor(p);
+    graphicsLayer.add(new EsriGraphic({geometry:{type:"point",longitude:co.longitude,latitude:co.latitude,spatialReference:{wkid:4326}},symbol:{type:"picture-marker",url:createMarkerSvg(color),width:"34px",height:"43px",yoffset:"12px"},attributes:{code,deleg:x.delegacion,region:x.region,p:p.toFixed(1),av:a.av,base:a.base},popupTemplate:{title:"{code} · {deleg}",content:"<b>{region}</b><br>Avance: {av}<br>Línea base: {base}<br>Cumplimiento: <b>{p}%</b>"}}));
     drawn++;
   });
-
-  if($("map-status")){
-    $("map-status").textContent=`${drawn} delegaciones ubicadas`;
-  }
+  if($("map-status")) $("map-status").textContent=`${drawn} delegaciones ubicadas`;
 }
 if(sessionStorage.vif==="1")openApp();
