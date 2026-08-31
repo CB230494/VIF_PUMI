@@ -184,16 +184,17 @@ function addOptions(id,arr){const s=$(id), first=s.options[0].outerHTML;s.innerH
 function setup(){
   addOptions("fRegion",unique(DATA.registros.map(x=>x.region)));
   addOptions("fDeleg",unique(DATA.registros.map(x=>x.delegacion)));
+  addOptions("fAct",unique(DATA.registros.map(x=>`${x.codigo} · ${x.actividad}`)));
   addOptions("fMes",unique(DATA.registros.map(x=>x.mes_programado)));
   addOptions("fEje",unique(DATA.registros.map(x=>x.eje)));
   addOptions("fPob",unique(DATA.registros.map(x=>x.poblacion)));
-  ["fRegion","fDeleg","fTrim","fMes","fEje","fPob"].forEach(id=>$(id).onchange=render)
+  ["fRegion","fDeleg","fAct","fTrim","fMes","fEje","fPob"].forEach(id=>$(id).onchange=render)
 }
 function filtered(){
-  return DATA.registros.filter(x=>(!$("fRegion").value||x.region===$("fRegion").value)&&(!$("fDeleg").value||x.delegacion===$("fDeleg").value)&&(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))
+  return DATA.registros.filter(x=>(!$("fRegion").value||x.region===$("fRegion").value)&&(!$("fDeleg").value||x.delegacion===$("fDeleg").value)&&(!$("fAct").value||`${x.codigo} · ${x.actividad}`===$("fAct").value)&&(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))
 }
 function nonGeographicFiltered(){
-  return DATA.registros.filter(x=>(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))
+  return DATA.registros.filter(x=>(!$("fAct").value||`${x.codigo} · ${x.actividad}`===$("fAct").value)&&(!$("fTrim").value||x.trimestre===$("fTrim").value)&&(!$("fMes").value||x.mes_programado===$("fMes").value)&&(!$("fEje").value||x.eje===$("fEje").value)&&(!$("fPob").value||x.poblacion===$("fPob").value))
 }
 function aggregate(rows){
   const dedup=new Map();
@@ -227,6 +228,7 @@ function aggregate(rows){
 function complianceClass(p){return p==null||!Number.isFinite(p)?"na":p>=50?"good":p>=25?"mid":"low"}
 function complianceColor(p){return p==null||!Number.isFinite(p)?"#8a98a8":p>=50?"#25865d":p>=25?"#d89a25":"#c64a4a"}
 function pctText(p){return p==null||!Number.isFinite(p)?"N/A":p.toFixed(1)+"%"}
+function displayEje(v){return v==="Justicia Restaurativa"?"Politica Justicia Restaurativa":v}
 function render(){
   const rows=filtered(), ag=aggregate(rows), p=ag.pct;
   $("kDeleg").textContent=unique(rows.map(x=>x.codigo_delegacion)).length;
@@ -253,7 +255,7 @@ function renderBars(rows,key,id){
   const groups={};rows.forEach(x=>(groups[x[key]]??=[]).push(x));
   $(id).innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,"es")).map(([k,v])=>{
     const a=aggregate(v),p=a.pct,w=p==null?0:Math.min(p,100);
-    return `<div class="barrow"><div class="barlabel"><b>${k||"Sin dato"}</b><span class="pct ${complianceClass(p)}">${pctText(p)}</span></div><div class="bar"><i style="width:${w}%;background:${complianceColor(p)}"></i></div></div>`
+    return `<div class="barrow"><div class="barlabel"><b>${key==="eje"?displayEje(k):(k||"Sin dato")}</b><span class="pct ${complianceClass(p)}">${pctText(p)}</span></div><div class="bar"><i style="width:${w}%;background:${complianceColor(p)}"></i></div></div>`
   }).join("")||"<p>Sin datos.</p>"
 }
 function renderTable(rows){
@@ -262,7 +264,7 @@ function renderTable(rows){
     const annualBase=+x.linea_base_anual||0;
     const p=(annualBase&&x.trimestre_programado===x.trimestre)?((+x.avance||0)/annualBase*100):null;
     const baseLabel=x.linea_base_texto||((annualBase)?annualBase:"");
-    return `<tr><td>${x.region}</td><td><b>${x.codigo_delegacion}</b> ${x.delegacion}</td><td><b>${x.codigo}</b> · ${x.actividad}</td><td>${x.eje||"—"}</td><td>${x.poblacion||"—"}</td><td>${x.mes_programado||"—"}</td><td>${x.trimestre}</td><td>${baseLabel||"—"}</td><td>${(+x.avance||0).toLocaleString("es-CR")}</td><td class="pct ${complianceClass(p)}">${pctText(p)}</td></tr>`
+    return `<tr><td>${x.region}</td><td><b>${x.codigo_delegacion}</b> ${x.delegacion}</td><td><b>${x.codigo}</b> · ${x.actividad}</td><td>${displayEje(x.eje)||"—"}</td><td>${x.poblacion||"—"}</td><td>${x.mes_programado||"—"}</td><td>${x.trimestre}</td><td>${baseLabel||"—"}</td><td>${(+x.avance||0).toLocaleString("es-CR")}</td><td class="pct ${complianceClass(p)}">${pctText(p)}</td></tr>`
   }).join("")
 }
 function initMap(){require(["esri/Map","esri/views/MapView","esri/layers/GraphicsLayer","esri/Graphic"],(Map,MapView,GraphicsLayer,Graphic)=>{window.EsriGraphic=Graphic;graphicsLayer=new GraphicsLayer();view=new MapView({container:"map",map:new Map({basemap:"streets-navigation-vector",layers:[graphicsLayer]}),center:[-84.1,9.95],zoom:7});renderMap(filtered())})}
